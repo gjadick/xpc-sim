@@ -41,7 +41,7 @@ def get_mu(beta, energy): # energy in keV -> linear atten coeff in m^-1
 
 # functions
     
-# thickness proj for sphere
+# thickness proj for SPHERE
 def get_t_j(x,y,r): 
     if r**2 > x**2 + y**2:
         return 2*np.sqrt(r**2 - x**2 - y**2)
@@ -55,6 +55,17 @@ def get_t_j_grid(x_vals, y_vals, r):
             t_j_grid[j,i] = get_t_j(x,y,r)
     return t_j_grid
 
+# thickness proj for GAUSSIAN
+    
+def get_t_grid_gaussian(x_vals, y_vals, sigma):
+    X, Y = np.meshgrid(x_vals, y_vals)
+    t_j_grid = 2*sigma*np.exp(-(X**2 + Y**2)/(2*sigma**2))#/(2*np.pi*sigma**2)
+    return t_j_grid
+    
+def get_ddt_grid_gaussian(x_vals, y_vals, sigma):
+    X, Y = np.meshgrid(x_vals, y_vals)
+    ddt_j_grid = 2*(X**2 + Y**2 - 2*sigma**2)*np.exp(-(X**2 + Y**2)/(2*sigma**2))/(sigma**3)
+    return ddt_j_grid
 
 def get_fftfreqs(Nx, Ny, dx, dy):
     '''
@@ -187,6 +198,45 @@ def get_dm_dA_mono(dA_1, dA_2, A_1, A_2, I_i, eta, prop_dist, mu_1, delta_1, mu_
     m_f = get_m_mono(A_1+dA_1, A_2+dA_2, I_i, eta, prop_dist, mu_1, delta_1, mu_2, delta_2, x_vals)
     dm_dA = (m_f - m_0)/(dA_1 + dA_2)
     return dm_dA
+
+def get_m_gauss(A_1, A_2, I_i, eta, prop_dist, mu_1, delta_1, mu_2, delta_2, x_vals):
+    t_1 = get_t_gauss(x_vals, x_vals, A_1)
+    ddt_1 = get_ddt_gauss(x_vals, x_vals, A_1)
+
+    t_2 = get_t_gauss(x_vals, x_vals, A_2)
+    ddt_2 = get_ddt_gauss(x_vals, x_vals, A_2)
+
+    arg_1 = -mu_1*t_1 + prop_dist*delta_1*ddt_1
+    arg_2 = -mu_2*t_2 + prop_dist*delta_2*ddt_2
+        
+    signal = I_i * eta * np.exp(arg_1 + arg_2)
+
+    return signal
+
+def get_dm_dA_gauss(ind, A_1, A_2, I_i, eta, prop_dist, mu_1, delta_1, mu_2, delta_2, x_vals):
+    # monoenergetic shortcut!!!
+    signal = get_dm_gauss(A_1, A_2, I_i, eta, prop_dist, mu_1, delta_1, mu_2, delta_2, x_vals)
+    
+    assert ind==1 or ind==2
+    if ind == 1:
+        A = A_1
+        mu = mu_1
+        delta = delta_1
+        t = get_t_gauss(x_vals, x_vals, A_1)
+        ddt = get_ddt_gauss(x_vals, x_vals, A_1)
+    else:
+        A = A_2
+        mu = mu_2
+        delta = delta_2
+        t = get_t_gauss(x_vals, x_vals, A_2)
+        ddt = get_ddt_gauss(x_vals, x_vals, A_2)
+    
+    X, Y = np.meshgrid(x_vals, x_vals)
+    term1 = -( X**2 + Y**2 + 2*A**2 )*np.exp((X**2 + Y**2)/(2*A**2))/(2*np.pi*A**5)
+    term2 = -( 8*A**4 + 8*A**2*(X**2 + Y**2) + X**4 + 2*X**2*Y**2 + Y**4 )*np.exp((X**2 + Y**2)/(2*A**2))/(2*np.pi*A**9)
+    
+    return signal*(-mu*term1 - prop_dist*delta*term2)    
+
 
 
 def get_m_mono_fresnel(A_1, A_2, I_i, E, prop_dist, beta_1, delta_1, beta_2, delta_2, x_vals, px_sz, upsampx=None):
