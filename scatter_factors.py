@@ -64,7 +64,7 @@ import numpy as np
 #     rootpath = os.path.dirname(__file__)
 # except:
 #     rootpath = ''
-rootpath = 'scatter_data'  # !!! might need to change this !!!
+rootpath = 'input/scatter_data'  # !!! might need to change this !!!
 
 
 ### CONSTANTS
@@ -242,7 +242,7 @@ def parse_matcomp(name):
     matnames - list of individual element names, e.g. ['H','O']
     weights - list of corresponding weights, e.g. [88.8, 11.2]
     """
-
+    
     matnames = []
     weights = []
 
@@ -352,7 +352,7 @@ def get_delta_beta_mix(matcomp, energy, density, elem_format=ELEM_FORMAT_DEFAULT
 
     # check for mixture or single
     if N_elems == 1: # single element
-        elem = matnames[i]
+        elem = matnames[0]
         A = get_amass(elem, elem_format) # atomic mass
         f1, f2 = get_f1_f2(elem, energy, elem_format)
     else:
