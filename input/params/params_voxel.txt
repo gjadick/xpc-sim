@@ -1,0 +1,28 @@
+{
+    "RUN_ID": "zebrafish2D_multislice_px500nm_prop050mm",
+    "propagation_distance": [50e-3],
+    "number_of_projection_slices": [1, 2, 4, 8, 16, 32, 64],
+    
+    "wave_amplitude": 1.0,
+    "wave_energy": 20.0,
+    
+    "grid_size": 5000,
+    "pixel_size": 0.5e-6,
+    "upsample_multiple": 2,
+    
+    "phantom": {
+        "phantom_type": "voxel",
+        "object": {
+            "name": "zebrafish",
+            "phantom_filepath": "./input/phantom/zebrafish_2D/",
+            "phantom_filename": "zebrafish_interp2d_10000_10000_0.25um_4mat_uint8.bin",
+            "material_filename": "materials.csv",
+            "phantom_Nx": 10000,
+            "phantom_Ny": 10000,
+            "phantom_Nz": 1,
+            "voxel_dx": 0.25e-6, 
+            "voxel_dy": 0.25e-6, 
+            "voxel_dz": 5e-3
+        }
+    }
+}

@@ -1,0 +1,31 @@
+{
+    "RUN_ID": "spie24/crlb_PMMA_Al_x64_10um",
+    "NOTES": "dr = 1e-12 m, propagation_distance gives range (1 mm increments)",
+    "propagation_distance": [0.0, 0.3],
+    "number_of_projection_slices": 1,
+    
+    "wave_amplitude": 1.0,
+    "wave_energy": [24.0, 34.0],
+    
+    "grid_size": 128,
+    "pixel_size": 10e-6,
+    "upsample_multiple": 64,
+    
+    "phantom": {
+        "phantom_type": "two_objects",
+        "object1": {
+            "shape": "sphere",
+            "material_name": "PMMA",
+            "material_composition": "H(8.0541)C(59.9846)O(31.9613)",
+            "density": 1.19,
+            "radius": 400e-6
+        },
+        "object2": {
+            "shape": "sphere",
+            "material_name": "Aluminum",
+            "material_composition": "Al(100.0)",
+            "density": 2.699,
+            "radius": 100e-6
+        }
+    }
+}
