@@ -1,0 +1,3 @@
+[submodule "xtomosim"]
+	path = xtomosim
+	url = https://github.com/gjadick/xtomosim.git
