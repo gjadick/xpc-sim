@@ -24,6 +24,7 @@ import csv
 import os
 import xscatter as xsf  # x-ray scatter factors
 import xcompy as xc  # x-ray linear attenuation coefficients
+from xtomosim.system import ParallelBeamGeometry
 
 # Physical constants
 PLANCK = 6.62607015e-34  # [J/Hz] Planck constant h
@@ -207,7 +208,7 @@ class VoxelPhantom(Phantom):
         density, matcomp = self.material_dict[voxel_id]
         return get_mu(energy, matcomp, density)  
     
-    def delta_beta_slice(self, energy, z_ind):
+    def delta_beta_slice(self, energy, z_ind=0):
         d_slice = self.d_voxels[z_ind, :, :]
         d_delta_slice = cp.zeros(d_slice.shape)
         d_beta_slice = cp.zeros(d_slice.shape)
@@ -485,12 +486,68 @@ def read_parameter_file(filename):
 
 
 
+def read_parameter_file_ct(filename):  ## different formatting for CT sim
+    """
+    All lengths should be in units [m]
+    """
+    with open(filename) as f:
+        all_parameters = json.load(f)
+
+    # Make dictionaries for each set of parameter combinations
+    param_keys = list(all_parameters.keys())
+    param_value_combos = make_combos(list(all_parameters.values()))
+    param_dicts = [dict(zip(param_keys, values)) for values in param_value_combos]
+    
+    # Package the parameters into objects for each run
+    param_list = []
+    for p in param_dicts:
+
+        # Wave
+        num_pixels = int(p['N_channels'])
+        px_size = p['beam_width'] / p['N_channels']
+        grid_shape = [num_pixels, 1]  # 1D! 
+        pixel_scale = [px_size, p['detector_px_height']]
+        wave = Wave(p['wave_amplitude'], p['wave_energy'], grid_shape, pixel_scale)
+        
+        # Voxel phantom
+        if p['phantom_type'] != 'voxel':
+            print('CT parameters only defined for voxel phantom!')
+            return -1
+        phantom_filename = os.path.join(p['phantom_filepath'], p['phantom_filename'])
+        material_filename = os.path.join(p['phantom_filepath'], p['material_filename'])
+        shape = [p['phantom_Nx'], p['phantom_Ny'], p['phantom_Nz']]
+        voxel_size = [p['voxel_dx'], p['voxel_dy'], p['voxel_dz']]
+        phantom = VoxelPhantom(p['phantom_name'], phantom_filename, material_filename,
+                     shape, voxel_size, dtype=np.uint8)
+        
+        # Scanner geometry
+        if p['scanner_geometry'] != 'parallel_beam':
+            print('CT parameters only defined for parallel_beam geometry!')
+            return -1
+        eid = p['detector_mode'] == 'eid'  # convert to bool
+        ct = ParallelBeamGeometry(N_channels=p['N_channels'], 
+                                  N_proj=p['N_projections'],
+                                  beam_width=p['beam_width'], 
+                                  theta_tot=p['rotation_angle_total'],
+                                  SID=p['SID'], 
+                                  SDD=p['SDD'],  # for propagation-based imaging, SDD is the object exit plane location.
+                                  eid=eid, 
+                                  h_iso=p['detector_px_height'],
+                                  detector_file=p['detector_filename'],
+                                  detector_std_electronic=p['detector_std_electronic'])
+    
+        param_list.append([p['RUN_ID'],
+                           p['propagation_distance'],
+                           p['number_of_projection_slices'],
+                           p['upsample_multiple'], 
+                           wave, phantom, ct])
+    return param_list
 
 
 if __name__=='__main__':
     
     #read_parameter_file('parameters.txt')
-    parameter_sets = read_parameter_file('params_voxel.txt')
+    parameter_sets = read_parameter_file_ct('input/params/params_voxel.txt')
 
         
     # N_matrix = 1024

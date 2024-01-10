@@ -1,7 +1,7 @@
 {
-    "RUN_ID": "zebrafish2D_multislice_px500nm_prop050mm",
-    "propagation_distance": [50e-3],
-    "number_of_projection_slices": [1, 2, 4, 8, 16, 32, 64],
+    "RUN_ID": "FISHTEST",
+    "propagation_distance": 100e-3,
+    "number_of_projection_slices": 1,
     
     "wave_amplitude": 1.0,
     "wave_energy": 20.0,
@@ -10,19 +10,32 @@
     "pixel_size": 0.5e-6,
     "upsample_multiple": 2,
     
-    "phantom": {
-        "phantom_type": "voxel",
-        "object": {
-            "name": "zebrafish",
-            "phantom_filepath": "./input/phantom/zebrafish_2D/",
-            "phantom_filename": "zebrafish_interp2d_10000_10000_0.25um_4mat_uint8.bin",
-            "material_filename": "materials.csv",
-            "phantom_Nx": 10000,
-            "phantom_Ny": 10000,
-            "phantom_Nz": 1,
-            "voxel_dx": 0.25e-6, 
-            "voxel_dy": 0.25e-6, 
-            "voxel_dz": 5e-3
-        }
-    }
+    "phantom_type": "voxel",
+    "phantom_name": "zebrafish",
+    "phantom_filepath": "./input/phantom/zebrafish_2D/",
+    "phantom_filename": "zebrafish_1685_1685_1.43um_4mat_uint8.bin",
+    "material_filename": "materials.csv",
+    "phantom_Nx": 1685,
+    "phantom_Ny": 1685,
+    "phantom_Nz": 1,
+    "voxel_dx": 1.43e-6, 
+    "voxel_dy": 1.43e-6, 
+    "voxel_dz": 5e-3,
+    
+    "scanner_geometry": "parallel_beam",
+    "SID": 2e-3,
+    "SDD": 4.5e-3,
+    "N_channels": 3500,
+    "N_projections": 5000,
+    "beam_width": 3.5e-3,
+    "rotation_angle_total": 3.141592654,
+    
+    "detector_px_height": 1.0,
+    "detector_mode": "pcd",
+    "detector_std_electronic": 0,
+    "detector_filename": "ideal",
+
+    "N_recon_matrix": 512,
+    "FOV_recon": 2.40955e-3,
+    "ramp_filter_percent_Nyquist": 1.0
 }
