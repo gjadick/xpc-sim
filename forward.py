@@ -235,3 +235,61 @@ def detect_wave(in_wave, wave, upsample_multiple, fwhm=10e-6, N_kernel=129):
     
 
 
+
+## 1D propagation for a CT simulation slice
+
+def project_db(d_proj_delta, d_proj_beta, proj_thickness, wavenum, I0=1):
+    """
+    Computes projection through object for given delta, beta line integrals.
+
+    Parameters
+    ----------
+    d_proj_delta : N-D cupy array
+        DESCRIPTION.
+    d_proj_beta : N-D cupy array
+        DESCRIPTION.
+    proj_thickness : float
+        DESCRIPTION.
+    wavenum : float
+        DESCRIPTION.
+    I0 : float OR N-D cupy array, optional
+        DESCRIPTION. The default is 1.
+
+    Returns
+    -------
+    N-D cupy array
+        DESCRIPTION.
+
+    """
+    return I0 * cp.exp(-wavenum * (1j*d_proj_delta + d_proj_beta)) * cp.exp(1j * wavenum * proj_thickness)
+
+
+def propagate_1D(prop_dist, d_wave, beam_width, wavelen): 
+
+    # Compute 1D Fresnel propagator.
+    Nx = d_wave.size
+    d_fx = cp.arange(-Nx/2, Nx/2, 1)/beam_width + 1/(2*beam_width)  # centered frequencies of detector channels
+    d_H = cp.fft.fftshift(cp.exp(-1j * wavelen * PI * prop_dist * d_fx**2))  # non-centered Fresnel operator
+    #d_fx_grid, d_fy_grid = cp.meshgrid(d_fx, d_fx)
+    #d_H_grid = cp.exp(-1j * wavelen * PI * prop_dist * (d_fx_grid**2 + d_fy_grid**2))  # non-centered Fresnel operator
+
+    # Convolve wave in Fourier space.
+    d_wave_ft = cp.fft.fft(d_wave)
+    d_fsp_wave = cp.fft.ifft(d_wave_ft * d_H) # * cp.exp(1j*in_wave.wavenum*prop_dist) 
+    return d_fsp_wave
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+
+
