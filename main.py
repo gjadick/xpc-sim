@@ -104,10 +104,10 @@ def multislice_xpci(ct, phantom, wave, prop_dist, upx, N_slices=0, thetas=None):
         trg_y = ((i_slice+1)*slice_width - ct.SID) * cp.sin(d_thetas + cp.pi) + d_channels * cp.sin(d_thetas + cp.pi/2)
         sino_stack = cp.zeros([N_thetas, N_channels_upx, 2], dtype=cp.float32)
         for i in range(2): 
-            line_integrals = siddons_2D(trg_x, src_y, trg_x, trg_y, matrix_stack[i], phantom.dx)
+            line_integrals = siddons_2D(src_x, src_y, trg_x, trg_y, matrix_stack[i], phantom.dx)
             sino_stack[:,:,i] = line_integrals.reshape([N_thetas, N_channels_upx])
         d_sino_delta, d_sino_beta = sino_stack[:,:,0], sino_stack[:,:,1] 
-        d_sino_upx *= cp.exp(-in_wave.wavenum * (1j*d_sino_delta + d_sino_beta))        
+        d_sino_upx *= cp.exp(-wave.wavenum * (1j*d_sino_delta + d_sino_beta))        
         for i_view in range(N_thetas):  
             d_sino_upx[i_view] = propagate_1D(prop_dist, d_sino_upx[i_view], ct.beam_width, wave.wavelen)
         src_x = trg_x  # update source coordinates for next run
@@ -202,9 +202,9 @@ if __name__ == '__main__':
         m = ax[1].imshow(d_phantom_beta.get(), **kw)
         fig.colorbar(m, ax=ax[1])
         ax[1].set_title('beta')
-        # for axi in ax:  # this does not run?
-        #     axi.set_xlabel('x [micron]')
-        #     axi.set_ylabel('y [micron]')
+        for axi in ax:  # this does not run?
+            axi.set_xlabel('x [micron]')
+            axi.set_ylabel('y [micron]')
         fig.tight_layout()
         plt.show()
     
