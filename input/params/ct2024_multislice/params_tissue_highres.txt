@@ -1,0 +1,41 @@
+{
+    "RUN_ID": "ct24/tissuefish_highres",
+    "propagation_distance": 100e-3,
+    "number_of_projection_slices": 10,
+    
+    "wave_amplitude": 1.0,
+    "wave_energy": 20.0,
+    
+    "grid_size": 5000,
+    "pixel_size": 0.5e-6,
+    "upsample_multiple": 2,
+    
+    "phantom_type": "voxel",
+    "phantom_name": "zebrafish",
+    "phantom_filepath": "./input/phantom/zebrafish_2D/",
+    "phantom_filename": "zebrafish_1590_1590_4mat_uint8.bin",
+    "material_filename": "materials_tissue.csv",
+    "phantom_Nx": 1590,
+    "phantom_Ny": 1590,
+    "phantom_Nz": 1,
+    "voxel_dx": 3.14465408805e-06, 
+    "voxel_dy": 3.14465408805e-06, 
+    "voxel_dz": 5.0e-3,
+    
+    "scanner_geometry": "parallel_beam",
+    "SID": 3.5e-3,
+    "SDD": 7.0e-3,
+    "N_channels": 14000,
+    "N_projections": 5000,
+    "beam_width": 7.0e-3,
+    "rotation_angle_total": 3.141592654,
+    
+    "detector_px_height": 1.0,
+    "detector_mode": "pcd",
+    "detector_std_electronic": 0,
+    "detector_filename": "ideal",
+
+    "N_recon_matrix": 512,
+    "FOV_recon": 5.0e-3,
+    "ramp_filter_percent_Nyquist": 1.0
+}
