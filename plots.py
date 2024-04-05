@@ -42,10 +42,179 @@ plt.rcParams.update({
      "lines.linewidth":1,
      })
 
-# #%% PLOT : SNR vs prop_dist for different grid pixel size (same upsample frequency)
 
-# main_dir = 'output/spie2024/'
-# sub_dirs = ['crlb_PMMA_Al_x16_025um', 'crlb_PMMA_Al_x32_05um', 'crlb_PMMA_Al_x64_10um']
+#%% PLOTs : VITM 24, sphere
+from scipy.signal import convolve2d
+from cupyx.scipy.signal import convolve2d as d_convolve2d
+import cupy as cp
+
+plt.rcParams.update({
+    "font.size":10,
+    "axes.titlesize":10,
+    "axes.labelsize": 8,
+    "axes.linewidth": .5,
+    "xtick.labelsize":6,
+    "ytick.labelsize":6,
+    "ytick.major.size":2,
+    "xtick.major.size":2,
+})
+    
+
+def measure_divergence(im, im_ref):
+    assert im.size == im_ref.size
+    N = im.size
+    D = np.sqrt(np.sum((im - im_ref)**2) / N)
+    return D
+
+
+def blur2D_gpu(im, xc, fwhm):
+    gamma = fwhm/2
+    d_xc = cp.array(xc)
+    d_im = cp.array(im)
+    X, Y = cp.meshgrid(d_xc, d_xc)
+    lorentzian2d = 1 / (X**2 + Y**2 + gamma**2)**1.5
+    lorentzian2d = lorentzian2d / cp.sum(lorentzian2d) 
+    #plt.show()
+    return d_convolve2d(d_im, lorentzian2d, mode='same').get().astype(np.float32)
+
+
+def blur2D(im, x, y, fwhm):
+    gamma = fwhm/2
+    X, Y = np.meshgrid(x, y)
+    lorentzian2d = 1 / (X**2 + Y**2 + gamma**2)**1.5
+    lorentzian2d = lorentzian2d / np.sum(lorentzian2d) 
+    #plt.show()
+    return convolve2d(im, lorentzian2d, mode='same')
+
+
+figd = './output/vitm24/figs/'
+savefig = True
+
+
+
+#%%  vitm fig 2 - spheres
+
+
+propdists = np.array([0, 50, 100])  # mm
+pxszs = np.array([50, 500])  # nm
+maxslices = 50
+
+fwhm = 1  # um
+blur = True
+
+
+fig, AX = plt.subplots(2, 4, figsize=[8.5,3.4])#, width_ratios=[1, 1, 1, 1.2])
+
+for j, pxsz in enumerate(pxszs):
+    
+    ax = AX[j]
+    
+    for i, R in enumerate(propdists):
+        if j==0:
+            ax[i].set_title(f'{R:.0f} mm')
+            ax[-1].set_title('Divergence')
+        else:
+            ax[i].set_xlabel('$\\mu$m')
+            ax[-1].set_xlabel('number of slices')
+        #ax[0].set_ylabel('intensity')
+        #ax[-1].set_ylabel('divergence')
+        ax[-1].ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+        ax[0].text(-14, 0.8564, 'Intensity', rotation=90, fontsize=8)
+
+        indir = f'output/vitm24/sphereTest_multislice_px{pxsz:03}nm_prop{R:03}mm/'
+        ims = []
+        for k in range(maxslices):
+            im = np.fromfile(indir+f'run_{k}/img_float32.bin', dtype=np.float32)
+            N = int(np.sqrt(len(im)))
+            im = im.reshape([N,N])
+            FOV = N * pxsz / 1e3  # um
+            xcoord = (np.arange(-(N-1)/2, N/2) ) * pxsz / 1e3
+            if blur:
+                Nc = int(500/pxsz * 5)
+                xc_crop = xcoord[N//2-Nc:N//2+Nc]
+                #im = blur2D(im, xc_crop, xc_crop, fwhm=fwhm)  # all units in microns
+                im = blur2D_gpu(im, xc_crop, fwhm=fwhm)  # all units in microns
+            ims.append(im)
+            
+        dx = [0.11, 0.25][j]  # center the line profile
+        ax[i].plot(xcoord-dx, ims[0][N//2], 'k-', label='projection')
+        ax[i].plot(xcoord-dx, ims[-1][N//2], 'rgb'[i], label='multislice')
+        ax[i].legend(loc=(0.01, 0.04), fontsize=6, frameon=False)
+        ax[i].set_yticks(np.arange(0.854, 0.862, 0.002)) 
+        ax[i].set_xticks(np.arange(-8,9,4))
+        ax[i].set_ylim(0.8537, 0.8623)
+        ax[i].set_xlim(-9, 9)      
+        
+    divs = [measure_divergence(im, ims[-1]) for im in ims]
+    ax[-1].plot(range(1,maxslices), divs[1:], 'k')
+    ax[-1].set_xlim(-1,52)
+fig.tight_layout(w_pad=0.7, h_pad=0)
+if savefig:
+    plt.savefig(figd+f'spheres_blur{blur}.pdf', bbox_inches='tight')
+plt.show()
+
+
+#%% VITM fig 3 - zebrafish
+
+from matplotlib import patches
+
+slices =[1, 2, 4, 8, 16, 32, 64]
+i_slices = [0,1,2,4]
+pxsz = 500e-9
+indir = 'output/vitm24/zebrafish2D_multislice_px500nm_prop050mm/'
+N = 5000
+blur = True
+fwhm = 1  # um
+
+# load images
+ims = []
+for k in i_slices:
+    im = np.fromfile(indir+f'run_{k}/img_float32.bin', dtype=np.float32).reshape([N,N])
+    if blur:
+        xcoord = (np.arange(-(N-1)/2, N/2) ) * pxsz * 1e6  # units of micron
+        Nc = 27
+        xc_crop = xcoord[(N-Nc)//2:(N+Nc)//2] + (pxsz * 0.5e6)
+        im = blur2D_gpu(im, xc_crop, fwhm=fwhm)  # all units in microns
+    ims.append(im)
+
+cbar_pad = 0.02
+kw = {'cmap':'bwr', 'vmin':-0.089, 'vmax':0.089}
+kw0 = {'cmap':'gray', 'vmin':0.01, 'vmax':1.19}
+x0, y0 = 1850, 1850  # ROI
+dx, dy = 300, 300
+
+fig, AX = plt.subplots(2, 4, figsize=[11.5,5])#, width_ratios=[1, 1, 1, 1.2])
+ax, ax2 = AX[0], AX[1]
+for axi in AX.ravel():
+    axi.set_xticks([])
+    axi.set_yticks([])
+
+ax[0].set_title('Projection approximation')    
+m = ax[0].imshow(ims[0], **kw0)
+fig.colorbar(m, ax=ax[0], pad=cbar_pad)
+
+m = ax2[0].imshow(ims[0][y0:y0+dy, x0:x0+dx], **kw0)
+fig.colorbar(m, ax=ax2[0], pad=cbar_pad)
+
+for i in range(1,4):
+    
+    ax[i].set_title(f'Difference $N$ = {slices[i_slices[i]]}')
+    diff = ims[i] - ims[0] 
+    m = ax[i].imshow(diff, **kw)
+    fig.colorbar(m, ax=ax[i], pad=cbar_pad)
+    rect = patches.Rectangle((x0, y0), dx, dy, linewidth=1, edgecolor='r', facecolor='none')
+    ax[i].add_patch(rect)
+    
+    m = ax2[i].imshow(diff[y0:y0+dy, x0:x0+dx], **kw)
+    fig.colorbar(m, ax=ax2[i], pad=cbar_pad)
+
+fig.tight_layout(w_pad=0, h_pad=0.7)
+if savefig:
+    plt.savefig(figd+f'zebrafish_blur{blur}.pdf', bbox_inches='tight')
+plt.show()
+
+
+
 
 
 #%% PLOT : : SNR vs. prop dist
