@@ -430,7 +430,7 @@ def multislice_xpc_ct(ct, phantom, wave, prop_dist, upx, N_slices=0, thetas=None
 
 
 
-def do_recon_patch(sino, ct, N_matrix, FOV, ramp, N_matrix_patch=256): 
+def do_recon_patch(sino, ct, N_matrix, FOV, ramp, N_matrix_patch=512): 
     """
     The XPC-CT arrays can be too big for xtomosim at once, so this function
     reconstructs individual "patches" of the full FOV and then stitches them 

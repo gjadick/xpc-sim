@@ -538,7 +538,9 @@ def read_parameter_file_ct(filename):  ## different formatting for CT sim
                            p['propagation_distance'],
                            p['number_of_projection_slices'],
                            p['upsample_multiple'], 
-                           wave, phantom, ct])
+                           wave, phantom, ct,
+                           p['N_recon_matrix'], p['FOV_recon'], p['ramp_filter_percent_Nyquist']
+                           ])
     return param_list
 
 
