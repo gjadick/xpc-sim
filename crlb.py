@@ -4,6 +4,11 @@
 Created on Mon Nov 13 14:09:05 2023
 
 @author: giavanna
+
+A numerical approach to approximating the Cramer-Rao Lower Bound
+of spectral x-ray phase-contrast imaging in the context of material decomposition
+of a two-sphere object.
+
 """
 
 import matplotlib.pyplot as plt
@@ -17,34 +22,25 @@ import shutil
 import copy
 
 plt.rcParams.update({
-    # figure
-    "figure.dpi": 600,
-    # text
-    "font.size":10,
-    "font.family": "serif",
-    "font.serif": ['Computer Modern Roman'],
-    "text.usetex": True,
-    # axes
-    "axes.titlesize":10,
-    "axes.labelsize":8,
-    "axes.linewidth": .5,
-    # ticks
-    "xtick.top": True, 
-    "ytick.right": True, 
-    "xtick.direction": "in", 
-    "ytick.direction": "in",
-    "xtick.labelsize":8,
-    "ytick.labelsize":8,
-    # grid
-    "axes.grid" : False, 
-     "grid.color": "lightgray",
-     "grid.linestyle": ":",
-     # legend
-     "legend.fontsize":8,
-     # lines
-     #"lines.markersize":5,
-     "lines.linewidth":1,
+    'figure.dpi': 600,
+    'font.size':10,
+    'font.family': 'serif',
+    'font.serif': ['Computer Modern Roman'],
+    'text.usetex': True,
+    'axes.titlesize':10,
+    'axes.labelsize':8,
+    'axes.linewidth': .5,
+    'xtick.top': True, 
+    'ytick.right': True, 
+    'xtick.direction': 'in', 
+    'ytick.direction': 'in',
+    'xtick.labelsize':8,
+    'ytick.labelsize':8,
+    'legend.fontsize':8,
+    'lines.linewidth':1,
      })
+
+
 
 #%%
 if __name__ == '__main__':
