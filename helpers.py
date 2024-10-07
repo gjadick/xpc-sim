@@ -102,7 +102,7 @@ def get_mu(energy, matcomp, density):
   
 
 def block_mean_2d(arr, Nblock):
-    '''
+    """
     Computes the block mean over a 2D array `arr`
     in sublocks of size Nblock x Nblock.
     If an axis size of arr is not an integer multiple 
@@ -110,7 +110,7 @@ def block_mean_2d(arr, Nblock):
 
     This will cause image artifacts when fringes are too close
     relative to pixel size.
-    '''
+    """
     Ny, Nx = arr.shape
     padx, pady = 0, 0
     if Nx%Nblock != 0:
@@ -128,8 +128,6 @@ class Wave():
     """
     A class to handle an x-ray wave front. Currently only for a coherent,
     monochromatic plane wave.
-    
-    TODO: everything lol
     """
     def __init__(self, amplitude, energy, plane_shape, pixel_size):  # initialize the plane
         self.I0 = amplitude
@@ -544,72 +542,11 @@ def read_parameter_file_ct(filename):  ## different formatting for CT sim
     return param_list
 
 
+
+
 if __name__=='__main__':
-    
-    #read_parameter_file('parameters.txt')
+    # only for testing the parameter file
     parameter_sets = read_parameter_file_ct('input/params/params_voxel.txt')
 
-        
-    # N_matrix = 1024
-    # x_vals = np.linspace(-5., 5., N_matrix)
-    # N_runs = 1
 
-    # E = 30.0  # keV
-    # I0 = 1.0
-
-    # matname1 = 'copper'  
-    # matcomp1 = 'Cu(1.0)' 
-    # density1 = 8.96  # g/cm^3
-    # r1 = 2.0
-
-    # matname2 = 'PMMA'
-    # matcomp2 = 'H(8.0541)C(59.9846)O(31.9613)' 
-    # density2 =  1.19  # g/cm^3
-    # r2 = 1.2
-    
-    # #%%  f1, f2 tests - scatter_factors vs. periodictable
-    # evals = np.linspace(1,100,100) # keV
-
-    # PMMA = pt.formula('8.0541%wt H // 59.9846% C // O')
-    # PMMA.density = density2 # assign the density
-
-    # for matcomp, elem in [[matcomp1, pt.Cu], [matcomp2, PMMA]]:
-    #     fig,ax=plt.subplots(1,2,figsize=[7,3], dpi=300)
-
-    #     # method 1 
-    #     # f1, f2 = scaf.get_f1_f2_mix(matcomp, evals)
-    #     delta, beta = scaf.get_delta_beta_mix(matcomp, evals, elem.density)
-    #     ax[0].plot(evals, delta)
-    #     ax[1].plot(evals, beta)
-        
-    #     # method 2, using periodictable
-    #     n = pt.xsf.index_of_refraction(elem, energy=evals)
-    #     delta, beta = 1-n.real, -n.imag
-    
-    #     ax[0].plot(evals, delta, ls='--')
-    #     ax[1].plot(evals, beta, ls='--')
-    #     for axi in ax:
-    #         axi.set_yscale('log')
-    #         #axi.set_xscale('log')
-    #     fig.suptitle(matcomp)
-    #     plt.show()
-
-
-    #%%  MESHGRID TESTS
-    
-    # x = np.linspace(-500,500,2000)
-    # N_runs = 1000
-    
-    # t0 = time()
-    # for i in range(N_runs):
-    #     X,Y = np.meshgrid(x,x)
-    # print(time() - t0)
-
-    # # # compile first
-    # # X,Y = meshgrid(x,x)
-
-    # # t0 = time()
-    # # for i in range(N_runs):
-    # #     X,Y = meshgrid(x,x)
-    # # print(time() - t0)
 
