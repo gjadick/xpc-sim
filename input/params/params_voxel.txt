@@ -1,6 +1,6 @@
 {
     "RUN_ID": "FISHTEST",
-    "propagation_distance": 100e-3,
+    "propagation_distance": [0, 200e-3],
     "number_of_projection_slices": 0,
     
     "wave_amplitude": 1.0,
