@@ -14,7 +14,11 @@ to apply Paganin phase retrieval after.
 xpc.py also has functions for simulating 2D planar images of either voxelized
 or analytical phantoms. TODO: write a quick-start script for planar imaging.
 
-
+TODO: (also see comments throughout code below)
+    - Separate the Paganin phase retrieval in the CT sim function to its own function.
+    - Separate out the recon and put it in the main loop.
+    - Write functions for other phase retrieval methods.
+    - Write radiography sim function.
 """
 
 import numpy as np
@@ -37,9 +41,6 @@ from xpc import multislice_xpc_ct, do_recon_patch, paganin_thickness_sino
 ###
 
 paramfile = 'input/params/params_voxel.txt'
-show_phantom = True
-propdists = [0, 200e-3]
-do_phase_retrieval = False
 N_proj_batch = 1000  # make ct.N_proj is an integer multiple of N_proj_batch
 
 #################################################################
@@ -86,18 +87,17 @@ def save_and_imshow(arr, title, outdir, kw={'cmap':'gray'}):
     plt.show()
     
             
-            
-if __name__ == '__main__':
-    
-    # Parse params
-    parameter_sets = read_parameter_file_ct(paramfile)
-    params = parameter_sets[0]
-    run_id, _, N_slices, upx, wave, phantom, ct, N_matrix, FOV, ramp = params
+def simulate_xpc_ct(params, show_phantom=True, phase_retrieval=None, N_proj_batch_max=1000):
+    run_id, R, N_slices, upx, wave, phantom, ct, N_matrix, FOV, ramp = params
     outdir = f'output/{run_id}/'
     os.makedirs(outdir, exist_ok=True)
 
     do_multislice = N_slices > 1
-
+    if do_multislice:
+        print(f'Using multislice forward model (N slices = {N_slices})')
+    else:
+        print('Using projection approximation forward model')
+        
     # Show the phantom.
     d_phantom_delta, d_phantom_beta = phantom.delta_beta_slice(wave.energy, 0)
     if show_phantom:
@@ -119,64 +119,81 @@ if __name__ == '__main__':
 
 
     # Simulate CT scans at all propagation distances.
-    for R in propdists:
-        t0 = time()
+    N_batches = ct.N_proj // N_proj_batch_max
+    N_proj_batches_all = [N_proj_batch_max for i in range(N_batches)]
+    if ct.N_proj > N_proj_batch_max*N_batches:
+        N_proj_batches_all.append(ct.N_proj - N_proj_batch_max*N_batches)  # leftover views
+
+    d_sino = cp.zeros([ct.N_proj, ct.N_channels])
+    t0 = time()
+    for i, N_proj_batch in enumerate(N_proj_batches_all):
+        print(f'\n*** CT batch {i+1} / {len(N_proj_batches_all)}  ({N_proj_batch} thetas)')
+        i0 = i * N_proj_batch_max
+        thetas_batch = ct.thetas[i0:i0+N_proj_batch]  # source locations for this batch
+        d_sino[i0:i0+N_proj_batch] =  multislice_xpc_ct(ct, phantom, wave, R, upx, N_slices, thetas_batch).clip(0, None)
+    print(f'(R = {int(R*1e3)} mm) exit waves done - {time() - t0:.2f} s / {(time() - t0)/60:.1f} min \n')
+
+    logsino = -cp.log(d_sino).get()
+    save_and_imshow(logsino, f'R{int(R*1e3):03}mm_logsino_{N_slices}slices_{ct.N_proj}_{ct.N_channels}_float32', outdir)
+
+
+    # Reconstruct the raw phase-contrast CT image. 
+    # # TODO: separate out of this mega-function.
+    recon = do_recon_patch(logsino, ct, N_matrix, FOV, ramp)
+    save_and_imshow(recon, f'R{int(R*1e3):03}mm_recon_{N_slices}slices_{N_matrix}_float32', outdir)
     
-        N_batches = int(ct.N_proj / N_proj_batch)
+    
+    # Perform phase retrieval. 
+    # # TODO: separate out of mega-function and write a new function.
+    # # TODO: output the retrieved image(s).
+    # # TODO: other phase retrieval algorithms.
+    if phase_retrieval is None:
+        pass
+    elif phase_retrieval=='paganin': 
+        delta, _ =  get_delta_beta_mix('H(11.2)O(88.8)', wave.energy, 1)  # assume water
+        mu = mixatten('H(11.2)O(88.8)', np.array([wave.energy]))[0]
         
-        sino_list_prj = []
-        sino_list_ms = []
-        for i in range(N_batches):
-            print(f'Starting theta batch {i+1} / {N_batches}')
-            i0 = i * N_proj_batch
-            thetas_batch = ct.thetas[i0:i0+N_proj_batch]
+        T_sino = paganin_thickness_sino(d_sino, R, ct.beam_width, mu, delta).get()
+        save_and_imshow(T_sino, f'R{int(R*1e3):03}mm_paganin_sino_{N_slices}slices_{ct.N_proj}_{ct.N_channels}_float32', outdir)
+        T_recon = do_recon_patch(T_sino, ct, N_matrix, FOV, ramp)
+        save_and_imshow(T_recon, f'R{int(R*1e3):03}mm_paganin_recon_{N_slices}slices_{N_matrix}_float32', outdir)
+    else:
+        print(f'`phase_retrieval` = {phase_retrieval} is not a valid argument! Skipping phase retrieval...')
+
+    print(f'\n***\n*** R = {int(R*1e3)} mm finished - total time {time() - t0:.2f} s / {(time() - t0)/60:.1f} min \n***\n\n')
+    return logsino, recon
+
+
+def simulate_xpc_radiograph():  # TODO!
+    return None
+
+
             
-            # proj approx
-            d_sino_batch_prj = multislice_xpc_ct(ct, phantom, wave, prop_dist=R, upx=upx, thetas=thetas_batch, N_slices=0)
-            sino_list_prj.append(d_sino_batch_prj)
-            
-            # multislice
-            if do_multislice:
-                d_sino_batch_ms = multislice_xpc_ct(ct, phantom, wave, prop_dist=R, upx=upx, thetas=thetas_batch, N_slices=N_slices)
-                sino_list_ms.append(d_sino_batch_ms)
-       
-        print(f'(R = {int(R*1e3)} mm) exit waves done - {time() - t0:.2f} s / {(time() - t0)/60:.1f} min')
+if __name__ == '__main__':
+    recons = []
+    parameter_sets = read_parameter_file_ct(paramfile)
+    for params in parameter_sets:
+        logsino, recon = simulate_xpc_ct(params)#, phase_retrieval='paganin')
+        recons.append(recon)
+    
+    # Zoom in on an ROI to better see the difference with phase contrast
+    x0 = 600
+    y0 = 500
+    dx = 300
+    dy = 150
+    kw = {'cmap':'bwr', 'vmin':0, 'vmax':8000}
+    for i, recon in enumerate(recons):
+        R = params[1]
 
-
-        # Combine theta batches into one sinogram & reconstruct.
-        d_sino_prj = cp.array(sino_list_prj).reshape([ct.N_proj, ct.N_channels]).clip(0, None)
-        logsino_prj = -cp.log(d_sino_prj).get()
-        save_and_imshow(logsino_prj, f'R{int(R*1e3):03}mm_sino_prj_{ct.N_proj}_{ct.N_channels}_float32', outdir)
-        recon_prj = do_recon_patch(logsino_prj, ct, N_matrix, FOV, ramp)
-        save_and_imshow(recon_prj, f'R{int(R*1e3):03}mm_recon_prj_{N_matrix}_float32', outdir)
-
-        if do_multislice:
-            d_sino_ms = cp.array(sino_list_ms).reshape([ct.N_proj, ct.N_channels]).clip(0, None)
-            logsino_ms = -cp.log(d_sino_ms).get()
-            save_and_imshow(logsino_ms, f'R{int(R*1e3):03}mm_sino_{N_slices}ms_{ct.N_proj}_{ct.N_channels}_float32', outdir)
-            recon_ms = do_recon_patch(logsino_ms, ct, N_matrix, FOV, ramp)
-            save_and_imshow(recon_ms, f'R{int(R*1e3):03}mm_recon_{N_slices}ms_{N_matrix}_float32', outdir)
+        roi = recon[y0:y0+dy, x0:x0+dx]  # a region-of-interest
+        fig, ax = plt.subplots(1,2,figsize=[8,4])
+        ax[0].imshow(recon, aspect='auto', **kw)
+        ax[0].plot([x0, x0, x0+dx, x0+dx, x0], [y0, y0+dy, y0+dy, y0, y0], 'k-')
+        m = ax[1].imshow(roi, extent=(x0, x0+dx, y0, y0+dy), **kw)
+        fig.colorbar(m, ax=ax[1])
+        fig.suptitle(f'Propagation distance = {R*1e3:.0f} mm')
+        fig.tight_layout()
+        plt.show()
         
         
-        # Paganin
-        if do_phase_retrieval: 
-            delta, _ =  get_delta_beta_mix('H(11.2)O(88.8)', wave.energy, 1)  # assume water
-            mu = mixatten('H(11.2)O(88.8)', np.array([wave.energy]))[0]
-            
-            T_sino_prj = paganin_thickness_sino(d_sino_prj, R, ct.beam_width, mu, delta)
-            save_and_imshow(T_sino_prj.get(), f'R{int(R*1e3):03}mm_paganin_sino_prj_{ct.N_proj}_{ct.N_channels}_float32', outdir)
-            T_recon_prj = do_recon_patch(T_sino_prj.get(), ct, N_matrix, FOV, ramp)
-            save_and_imshow(T_recon_prj, f'R{int(R*1e3):03}mm_paganin_recon_prj_{N_matrix}_float32', outdir)
-
-            if do_multislice:
-                T_sino_ms = paganin_thickness_sino(d_sino_ms, R, ct.beam_width, mu, delta)
-                save_and_imshow(T_sino_ms.get(), f'R{int(R*1e3):03}mm_paganin_sino_{N_slices}ms_{ct.N_proj}_{ct.N_channels}_float32', outdir)
-                T_recon_ms = do_recon_patch(T_sino_ms.get(), ct, N_matrix, FOV, ramp)
-                save_and_imshow(T_recon_ms, f'R{int(R*1e3):03}mm_paganin_recon_{N_slices}ms_{N_matrix}_float32', outdir)
-
-
-        print(f'***\n*** R = {int(R*1e3)} mm finished - total time {time() - t0:.2f} s / {(time() - t0)/60:.1f} min \n***\n\n')
-
-
-
-
+        
