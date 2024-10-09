@@ -19,6 +19,7 @@ Created on Tue Oct  3 12:06:52 2023
 
 import numpy as np
 import cupy as cp
+from cupyx.scipy.interpolate import RegularGridInterpolator
 import json
 import csv
 import os
@@ -174,6 +175,7 @@ class Phantom():
         self.dx, self.dy, self.dz = voxel_size  # [m]
         self.FOVx = self.Nx*self.dx
         self.FOVy = self.Ny*self.dy
+        self.FOVz = self.Nz*self.dz
         
     def grid_coordinates(self):  # Define the grid coordinates
         d_x_vals = cp.linspace(-self.FOVx/2, self.FOVx/2, self.Nx).astype(real_type) + self.dx/2 
@@ -197,7 +199,27 @@ class VoxelPhantom(Phantom):
         # Load the material properties
         self.material_dict = material_csv_to_dict(material_filename)
         self.material_keys = list(self.material_dict.keys())
-            
+             
+    def resample_xy(self, Nx_new, Ny_new, dx_new, dy_new):
+        d_x_old = cp.linspace(-self.FOVx/2, self.FOVx/2, self.Nx).copy().astype(real_type) + self.dx/2 
+        d_y_old = cp.linspace(-self.FOVy/2, self.FOVy/2, self.Ny).copy().astype(real_type) + self.dy/2
+        d_z = cp.linspace(-self.FOVz/2, self.FOVz/2, self.Nz).astype(real_type) + self.dz/2
+        interp = RegularGridInterpolator((d_z, d_x_old, d_y_old), self.d_voxels, 
+                                         method='nearest', bounds_error=False, fill_value=0)
+
+        # update params
+        self.Nx, self.Ny = Nx_new, Ny_new
+        self.dx, self.dy = dx_new, dy_new
+        self.FOVx = Nx_new*dx_new
+        self.FOVy = Ny_new*dy_new
+        d_x_new = cp.linspace(-self.FOVx/2, self.FOVx/2, self.Nx).astype(real_type) + self.dx/2 
+        d_y_new = cp.linspace(-self.FOVy/2, self.FOVy/2, self.Ny).astype(real_type) + self.dy/2
+        
+        Z, Y, X = cp.meshgrid(d_z, d_y_new, d_x_new)
+        pts = cp.array([Z.ravel(), Y.ravel(), X.ravel()]).T
+        self.d_voxels = interp(pts).reshape([self.Nz, self.Ny, self.Nx]).astype(cp.uint8)
+        self.voxels = self.d_voxels.get()
+                    
     def delta_beta(self, energy, voxel_id):
         density, matcomp = self.material_dict[voxel_id]
         return get_delta_beta(energy, matcomp, density)
@@ -482,6 +504,43 @@ def read_parameter_file(filename):
                            wave, phantom])
     return param_list
 
+
+def read_parameter_file_proj(filename):
+    with open(filename) as f:
+        all_parameters = json.load(f)
+
+    # Make dictionaries for each set of parameter combinations
+    param_keys = list(all_parameters.keys())
+    param_value_combos = make_combos(list(all_parameters.values()))
+    param_dicts = [dict(zip(param_keys, values)) for values in param_value_combos]
+    
+    # Package the parameters into objects for each run
+    param_list = []
+    for p in param_dicts:
+        # The wave
+        num_pixels = int(p['grid_size'] * p['upsample_multiple'])  
+        px_size = p['pixel_size'] / p['upsample_multiple']
+        grid_shape = [num_pixels, num_pixels]
+        pixel_scale = [px_size, px_size]
+        wave = Wave(p['wave_amplitude'], p['wave_energy'], grid_shape, pixel_scale)
+        
+        # Voxel phantom
+        if p['phantom_type'] != 'voxel':
+            print('Projection parameters only defined for voxel phantom!')
+            return -1
+        phantom_filename = os.path.join(p['phantom_filepath'], p['phantom_filename'])
+        material_filename = os.path.join(p['phantom_filepath'], p['material_filename'])
+        shape = [p['phantom_Nx'], p['phantom_Ny'], p['phantom_Nz']]
+        voxel_size = [p['voxel_dx'], p['voxel_dy'], p['voxel_dz']]
+        phantom = VoxelPhantom(p['phantom_name'], phantom_filename, material_filename,
+                     shape, voxel_size, dtype=np.uint8)
+        
+        param_list.append([p['RUN_ID'],
+                           p['propagation_distance'],
+                           p['number_of_projection_slices'],
+                           p['upsample_multiple'], 
+                           wave, phantom])
+    return param_list
 
 
 def read_parameter_file_ct(filename):  ## different formatting for CT sim

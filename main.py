@@ -14,7 +14,7 @@ to apply Paganin phase retrieval after.
 xpc.py also has functions for simulating 2D planar images of either voxelized
 or analytical phantoms. TODO: write a quick-start script for planar imaging.
 
-TODO: (also see comments throughout code below)
+TODO: (also)
     - Separate the Paganin phase retrieval in the CT sim function to its own function.
     - Separate out the recon and put it in the main loop.
     - Write functions for other phase retrieval methods.
@@ -29,10 +29,11 @@ import os
 dir_path = os.path.dirname(os.path.realpath(__file__))
 os.chdir(dir_path)
     
-from helpers import read_parameter_file_ct
+from helpers import read_parameter_file_proj, read_parameter_file_ct
 from xscatter import get_delta_beta_mix
 from xcompy import mixatten
-from xpc import multislice_xpc_ct, do_recon_patch, paganin_thickness_sino
+from xpc import multislice_wave_voxels, free_space_propagate, detect_wave,\
+    multislice_xpc_ct, do_recon_patch, paganin_thickness_sino
 
 
 #################################################################
@@ -41,7 +42,7 @@ from xpc import multislice_xpc_ct, do_recon_patch, paganin_thickness_sino
 ###
 
 paramfile = 'input/params/params_voxel.txt'
-N_proj_batch = 1000  # make ct.N_proj is an integer multiple of N_proj_batch
+paramfile_proj = 'input/params/params_projtest.txt'
 
 #################################################################
 
@@ -164,36 +165,84 @@ def simulate_xpc_ct(params, show_phantom=True, phase_retrieval=None, N_proj_batc
     return logsino, recon
 
 
-def simulate_xpc_radiograph():  # TODO!
-    return None
+def simulate_xpc_projection(params):  # TODO!
+    run_id, R, N_slices, upx, in_wave, phantom = params
+    outdir = f'output/{run_id}/'
+    os.makedirs(outdir, exist_ok=True)
+    
+    try:
+        phantom.d_voxels  # check for VoxelPhantom class 
+    except:
+        print('invalid phantom type!')  # only voxel phantoms for now
+    
+    phantom.resample_xy(in_wave.Nx, in_wave.Ny, in_wave.dx, in_wave.dy)   
+    img = phantom.voxels[0]
+    
+    d_exit_wave = multislice_wave_voxels(in_wave, phantom, N_slices)
+    d_fsp_wave = free_space_propagate(in_wave, d_exit_wave, R)
+    img = detect_wave(in_wave, d_fsp_wave, upx, blur_fwhm=0).get()
 
+    save_and_imshow(img, f'R{int(R*1e3):03}mm_{N_slices}slices_float32', outdir)
+
+    return img
 
             
 if __name__ == '__main__':
-    recons = []
-    parameter_sets = read_parameter_file_ct(paramfile)
-    for params in parameter_sets:
-        logsino, recon = simulate_xpc_ct(params)#, phase_retrieval='paganin')
-        recons.append(recon)
     
-    # Zoom in on an ROI to better see the difference with phase contrast
-    x0 = 600
-    y0 = 500
-    dx = 300
-    dy = 150
-    kw = {'cmap':'bwr', 'vmin':0, 'vmax':8000}
-    for i, recon in enumerate(recons):
-        R = params[1]
+    test_project = True
+    test_ct = True
+    
+    if test_project:
+        parameter_sets = read_parameter_file_proj(paramfile_proj)
+        imgs = []
+        for params in parameter_sets:
+            img = simulate_xpc_projection(params)
+            imgs.append(img)
+                    
+        # Zoom in on an ROI to better see the difference with phase contrast
+        x0 = 600
+        y0 = 500
+        dx = 300
+        dy = 300
+        kw = {'cmap':'bwr', 'vmin':0, 'vmax':1.2}
+        for i, img in enumerate(imgs):
+            R = parameter_sets[i][1]    
+            roi = img[y0:y0+dy, x0:x0+dx]  # a region-of-interest
+            fig, ax = plt.subplots(1,2,figsize=[8,4])
+            ax[0].imshow(img, aspect='auto', **kw)
+            ax[0].plot([x0, x0, x0+dx, x0+dx, x0], [y0, y0+dy, y0+dy, y0, y0], 'k-')
+            m = ax[1].imshow(roi, extent=(x0, x0+dx, y0, y0+dy), **kw)
+            fig.colorbar(m, ax=ax[1])
+            fig.suptitle(f'Propagation distance = {R*1e3:.0f} mm')
+            fig.tight_layout()
+            plt.show()
+            
 
-        roi = recon[y0:y0+dy, x0:x0+dx]  # a region-of-interest
-        fig, ax = plt.subplots(1,2,figsize=[8,4])
-        ax[0].imshow(recon, aspect='auto', **kw)
-        ax[0].plot([x0, x0, x0+dx, x0+dx, x0], [y0, y0+dy, y0+dy, y0, y0], 'k-')
-        m = ax[1].imshow(roi, extent=(x0, x0+dx, y0, y0+dy), **kw)
-        fig.colorbar(m, ax=ax[1])
-        fig.suptitle(f'Propagation distance = {R*1e3:.0f} mm')
-        fig.tight_layout()
-        plt.show()
+    if test_ct:
+        parameter_sets = read_parameter_file_ct(paramfile)
+        recons = []
+        for params in parameter_sets:
+            logsino, recon = simulate_xpc_ct(params)#, phase_retrieval='paganin')
+            recons.append(recon)
         
+        # Zoom in on an ROI to better see the difference with phase contrast
+        x0 = 600
+        y0 = 500
+        dx = 300
+        dy = 150
+        kw = {'cmap':'bwr', 'vmin':0, 'vmax':8000}
+        for i, recon in enumerate(recons):
+            R = parameter_sets[i][1]
+    
+            roi = recon[y0:y0+dy, x0:x0+dx]  # a region-of-interest
+            fig, ax = plt.subplots(1,2,figsize=[8,4])
+            ax[0].imshow(recon, aspect='auto', **kw)
+            ax[0].plot([x0, x0, x0+dx, x0+dx, x0], [y0, y0+dy, y0+dy, y0, y0], 'k-')
+            m = ax[1].imshow(roi, extent=(x0, x0+dx, y0, y0+dy), **kw)
+            fig.colorbar(m, ax=ax[1])
+            fig.suptitle(f'Propagation distance = {R*1e3:.0f} mm')
+            fig.tight_layout()
+            plt.show()
+            
         
         

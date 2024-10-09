@@ -130,7 +130,7 @@ def multislice_wave_voxels(in_wave, phantom, N_slices):
     method to modulate in_wave with N_slices equally distributed over
     the phantom thickness dz.
     """
-    if N_slices == 1:
+    if N_slices <= 1:
         return project_wave_voxels(in_wave, phantom)
     
     slice_width = phantom.dz / N_slices  
@@ -457,6 +457,7 @@ def do_recon_patch(sino, ct, N_matrix, FOV, ramp, N_matrix_patch=512):
     
     recon = recon.clip(0, None)  # enfore non-negativity
     return recon
+
 
 
 
